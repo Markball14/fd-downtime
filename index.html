@@ -144,6 +144,20 @@ svg{display:block;overflow:visible}
 
 </script>
 <script>
+// Handle popup redirect - if this page is loaded in a popup with auth code, let MSAL handle it
+(async function(){
+  if(window.opener && (window.location.hash.includes('code=') || window.location.hash.includes('error=') || window.location.search.includes('code=') || window.location.search.includes('error='))){
+    try{
+      const clientId=window.opener.document?.getElementById('clientId')?.value||'c60b59ea-1aab-4be6-a25a-1441a4bbb19a';
+      const tenantId=window.opener.document?.getElementById('tenantId')?.value||'22358dd8-4bf4-45f9-8f45-6328d9c9944f';
+      const tempMsal=new msal.PublicClientApplication({auth:{clientId,authority:'https://login.microsoftonline.com/'+tenantId,redirectUri:'https://markball14.github.io/fd-downtime/'},cache:{cacheLocation:'sessionStorage',storeAuthStateInCookie:true}});
+      await tempMsal.initialize();
+      await tempMsal.handleRedirectPromise();
+    }catch(e){console.log('Popup handler:',e);}
+    return;
+  }
+})();
+
 const PAL=['#1a6fbe','#0a6644','#c45a28','#b02868','#8a5010','#4a28a8','#3a7a10','#a82828','#5a5a56','#107080','#c8a000','#2a8080'];
 let allData=[],msalInstance=null,currentAccount=null;
 
