@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head><title>Signing in...</title></head>
+<body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f4f3ef">
+<div style="text-align:center;color:#5a5a56">
+  <div style="width:36px;height:36px;border:3px solid #ddd;border-top-color:#1a6fbe;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px"></div>
+  <p style="font-size:14px">Completing sign in...</p>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+<script>
+// Just notify the parent window and close
+// MSAL in the parent window will handle the token from sessionStorage
+setTimeout(function(){
+  if(window.opener){
+    // Post the hash/search back to parent so MSAL can process it
+    window.opener.postMessage({
+      type:'msal_redirect',
+      hash: window.location.hash,
+      search: window.location.search
+    }, 'https://markball14.github.io');
+  }
+  window.close();
+}, 500);
+</script>
+</body>
+</html>
