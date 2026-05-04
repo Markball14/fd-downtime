@@ -150,7 +150,7 @@ svg{display:block;overflow:visible}
     try{
       const clientId=window.opener.document?.getElementById('clientId')?.value||'c60b59ea-1aab-4be6-a25a-1441a4bbb19a';
       const tenantId=window.opener.document?.getElementById('tenantId')?.value||'22358dd8-4bf4-45f9-8f45-6328d9c9944f';
-      const tempMsal=new msal.PublicClientApplication({auth:{clientId,authority:'https://login.microsoftonline.com/'+tenantId,redirectUri:'https://markball14.github.io/fd-downtime/'},cache:{cacheLocation:'sessionStorage',storeAuthStateInCookie:true}});
+      const tempMsal=new msal.PublicClientApplication({auth:{clientId,authority:'https://login.microsoftonline.com/'+tenantId,redirectUri:'https://markball14.github.io/fd-downtime/redirect.html'},cache:{cacheLocation:'sessionStorage',storeAuthStateInCookie:true}});
       await tempMsal.initialize();
       await tempMsal.handleRedirectPromise();
     }catch(e){console.log('Popup handler:',e);}
@@ -162,7 +162,7 @@ const PAL=['#1a6fbe','#0a6644','#c45a28','#b02868','#8a5010','#4a28a8','#3a7a10'
 let allData=[],msalInstance=null,currentAccount=null;
 
 function getMsalConfig(){
-  return{auth:{clientId:document.getElementById('clientId').value.trim(),authority:'https://login.microsoftonline.com/'+document.getElementById('tenantId').value.trim(),redirectUri:'https://markball14.github.io/fd-downtime/'},cache:{cacheLocation:'sessionStorage',storeAuthStateInCookie:true}};
+  return{auth:{clientId:document.getElementById('clientId').value.trim(),authority:'https://login.microsoftonline.com/'+document.getElementById('tenantId').value.trim(),redirectUri:'https://markball14.github.io/fd-downtime/redirect.html'},cache:{cacheLocation:'sessionStorage',storeAuthStateInCookie:true}};
 }
 
 async function signIn(){

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head><title>Signing in...</title></head>
+<body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f4f3ef">
+<div style="text-align:center;color:#5a5a56">
+  <div style="width:36px;height:36px;border:3px solid #ddd;border-top-color:#1a6fbe;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px"></div>
+  <p style="font-size:14px">Completing sign in...</p>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+<script>
+(async function(){
+  try{
+    const clientId='c60b59ea-1aab-4be6-a25a-1441a4bbb19a';
+    const tenantId='22358dd8-4bf4-45f9-8f45-6328d9c9944f';
+    const instance=new msal.PublicClientApplication({
+      auth:{
+        clientId,
+        authority:'https://login.microsoftonline.com/'+tenantId,
+        redirectUri:'https://markball14.github.io/fd-downtime/redirect.html'
+      },
+      cache:{cacheLocation:'sessionStorage',storeAuthStateInCookie:true}
+    });
+    await instance.initialize();
+    await instance.handleRedirectPromise();
+    // If we get here the popup should close itself
+    if(window.opener) window.close();
+  }catch(e){
+    console.error('Redirect error:',e);
+    if(window.opener) window.close();
+  }
+})();
+</script>
+</body>
+</html>
