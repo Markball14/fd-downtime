@@ -45,7 +45,11 @@ hr.div{border:none;border-top:1px solid var(--border);margin:1.5rem 0}
 .filter-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.65rem 1rem;margin-bottom:1rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .filter-bar label{font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
 .filter-bar select{font-size:12px;padding:4px 7px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--bg);color:var(--text);cursor:pointer}
-.filter-bar input[type="date"]{font-size:12px;padding:4px 7px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--bg);color:var(--text);cursor:pointer;height:28px}.filter-bar .date-sep{font-size:11px;color:var(--text3)}.filter-bar .filter-section{display:flex;align-items:center;gap:5px;padding-right:8px;border-right:1px solid var(--border);margin-right:3px}
+.filter-bar input[type="date"]{font-size:12px;padding:4px 8px;border:1px solid var(--blue);border-radius:var(--rs);background:var(--blue-bg);color:var(--text);cursor:pointer;height:28px;font-family:inherit}
+.filter-bar input[type="date"]:focus{outline:none;border-color:var(--blue)}
+.date-sep{font-size:13px;color:var(--text3);font-weight:500}
+.date-range-group{display:flex;align-items:center;gap:6px;background:var(--blue-bg);border:1px solid var(--blue);border-radius:var(--rs);padding:3px 10px;margin-right:6px}
+.date-range-group label{color:var(--blue);font-size:10px;letter-spacing:.06em}
 .filter-spacer{flex:1}
 #recordCount{font-size:11px;color:var(--text3)}
 .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:1rem}
@@ -110,13 +114,13 @@ svg{display:block;overflow:visible}
   </div>
   <div id="dashboard">
     <div class="filter-bar">
-      <div class="filter-section">
-        <label>Date range:</label>
-        <input type="date" id="fDateFrom" onchange="applyFilters()" title="From date"/>
-        <span class="date-sep">→</span>
-        <input type="date" id="fDateTo" onchange="applyFilters()" title="To date"/>
+      <div class="date-range-group">
+        <label>FROM</label>
+        <input type="date" id="fDateFrom" onchange="applyFilters()" title="Start date"/>
+        <span class="date-sep">—</span>
+        <label>TO</label>
+        <input type="date" id="fDateTo" onchange="applyFilters()" title="End date"/>
       </div>
-      <label>Filter:</label>
       <select id="fLine" onchange="applyFilters()"><option value="">All lines</option></select>
       <select id="fShift" onchange="applyFilters()"><option value="">All shifts</option></select>
       <select id="fCat" onchange="applyFilters()"><option value="">All categories</option></select>
