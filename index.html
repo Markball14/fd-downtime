@@ -144,56 +144,22 @@ svg{display:block;overflow:visible}
 
 </script>
 <script>
-// Handle redirect promise on page load (for loginRedirect flow)
-window.addEventListener('load', async function(){
-  // Hide sign in button while checking auth state
-  document.getElementById('signInBtn').disabled=true;
-  document.getElementById('signInBtn').textContent='Checking...';
-  try{
-    const cfg=getMsalConfig();
-    msalInstance=new msal.PublicClientApplication(cfg);
-    await msalInstance.initialize();
-    const resp=await msalInstance.handleRedirectPromise();
-    if(resp&&resp.account){
-      // Successfully got token from redirect
-      currentAccount=resp.account;
-      document.getElementById('refreshBtn').style.display='';
-      document.getElementById('signOutBtn').style.display='';
-      setStatus('Signed in as '+resp.account.username+'. Loading file...','s-info');
-      await loadFromSharePoint();
-      return;
-    }
-    // Check if already signed in
-    const accounts=msalInstance.getAllAccounts();
-    if(accounts.length>0){
-      currentAccount=accounts[0];
-      document.getElementById('refreshBtn').style.display='';
-      document.getElementById('signOutBtn').style.display='';
-      setStatus('Resuming session...','s-info');
-      await loadFromSharePoint();
-      return;
-    }
-  }catch(e){
-    console.error('Page load auth error:',e);
-  }
-  // No active session - show sign in button
-  document.getElementById('signInBtn').disabled=false;
-  document.getElementById('signInBtn').textContent='Sign in with Microsoft';
-});
-
 const PAL=['#1a6fbe','#0a6644','#c45a28','#b02868','#8a5010','#4a28a8','#3a7a10','#a82828','#5a5a56','#107080','#c8a000','#2a8080'];
 let allData=[],msalInstance=null,currentAccount=null;
 
 function getMsalConfig(){
-  return{auth:{clientId:document.getElementById('clientId').value.trim(),authority:'https://login.microsoftonline.com/'+document.getElementById('tenantId').value.trim(),redirectUri:'https://markball14.github.io/fd-downtime/'},cache:{cacheLocation:'sessionStorage',storeAuthStateInCookie:true}};
+  return{auth:{clientId:document.getElementById('clientId').value.trim(),authority:'https://login.microsoftonline.com/'+document.getElementById('tenantId').value.trim(),redirectUri:'https://stellachewys-my.sharepoint.com/personal/msheard_stellaandchewys_com/Documents/Shared%20Folder/Downtime%20Tracker/auth_redirect.html'},cache:{cacheLocation:'sessionStorage',storeAuthStateInCookie:true}};
 }
 
 async function signIn(){
-  setStatus('Redirecting to Microsoft login...','s-info');setBtnLoading(true);
+  setStatus('Initialising Microsoft login...','s-info');setBtnLoading(true);
   try{
     msalInstance=new msal.PublicClientApplication(getMsalConfig());
     await msalInstance.initialize();
-    await msalInstance.loginRedirect({scopes:['User.Read','Files.Read','Files.Read.All','Sites.Read.All'],prompt:'select_account'});
+    const resp=await msalInstance.loginPopup({scopes:['User.Read','Files.Read','Files.Read.All','Sites.Read.All'],prompt:'select_account'});
+    currentAccount=resp.account;
+    setStatus('Signed in as '+resp.account.username+'. Loading file...','s-info');
+    await loadFromSharePoint();
   }catch(err){
     console.error(err);
     setStatus('Sign-in failed: '+(err.message||err.errorCode||JSON.stringify(err)),'s-error');
@@ -312,6 +278,24 @@ function parseSheet(xml,ss){
   return rows.map(r=>cols.slice(0,24).map(c=>r[c]||''));
 }
 
+// Convert Excel serial date number to mm/dd/yy string
+function excelDateToStr(val){
+  if(!val)return'';
+  const v=String(val).trim();
+  // Already looks like a date string (contains - or /)
+  if(/\d{4}-\d{2}-\d{2}/.test(v))return v; // keep ISO format used elsewhere
+  if(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(v))return v;
+  const n=parseFloat(v);
+  if(!isNaN(n)&&n>40000&&n<60000){
+    const d=new Date((n-25569)*86400*1000);
+    const mm=String(d.getUTCMonth()+1).padStart(2,'0');
+    const dd=String(d.getUTCDate()).padStart(2,'0');
+    const yy=String(d.getUTCFullYear()).slice(-2);
+    return mm+'/'+dd+'/'+yy;
+  }
+  return v;
+}
+
 // Data parsing
 function normLine(l){if(!l)return null;const lo=l.trim().toLowerCase().replace(/\s+/g,'');if(lo==='vk'||lo==='viking2')return'Viking 2';if(lo==='viking1')return'Viking 1';if(lo==='viking3')return'Viking 3';if(lo==='flmatrix')return'FL Matrix';if(lo==='frozen'||lo==='frozenline')return'Frozen Line';return l.trim().replace(/\b\w/g,c=>c.toUpperCase());}
 function normStatus(s){if(!s)return'';const lo=s.trim().toLowerCase();if(/^open/.test(lo))return'Open';if(/run|progress|process|progres/.test(lo))return'Running';if(/clos|done|complet/.test(lo))return'Closed';if(/not.?run/.test(lo))return'Not Running';return s.trim();}
@@ -321,11 +305,11 @@ function parseRows(rows){
   let hi=0;for(let i=0;i<Math.min(4,rows.length);i++){if(rows[i].some(c=>String(c).toLowerCase().includes('date')||String(c).toLowerCase().includes('line'))){hi=i;break;}}
   const data=[];
   for(let i=hi+1;i<rows.length;i++){
-    const r=rows[i];const date=(r[0]||'').trim();const line=normLine(r[2]);if(!date||!line)continue;
+    const r=rows[i];const date=excelDateToStr((r[0]||'').trim());const line=normLine(r[2]);if(!date||!line)continue;
     let dt=null;const c20=(r[20]||'').trim();if(c20){try{const v=parseFloat(c20);if(v>0)dt=v;}catch(e){}}
     if(!dt){const s=toMins(r[3]),e=toMins(r[5]);if(s!==null&&e!==null){let d=e-s;if(d<0)d+=1440;if(d>0&&d<600)dt=d;}}
     let resp=null;const c18=(r[18]||'').trim();if(c18){try{const v=parseFloat(c18);if(v>=0)resp=v;}catch(e){}}
-    data.push({date,shift:(r[1]||'').trim(),line,category:(r[6]||'Unclassified').trim()||'Unclassified',issue:(r[7]||'').trim(),rootCause:(r[8]||'').trim(),dept:(r[9]||'').trim(),actionOwner:(r[12]||'').trim(),dueDate:(r[13]||'').trim(),status:normStatus(r[14]),downtimeMins:dt,responseMins:resp,month:(r[23]||'').trim(),week:(r[22]||'').trim()});
+    data.push({date,shift:(r[1]||'').trim(),line,category:(r[6]||'Unclassified').trim()||'Unclassified',issue:(r[7]||'').trim(),rootCause:(r[8]||'').trim(),dept:(r[9]||'').trim(),actionOwner:(r[12]||'').trim(),dueDate:excelDateToStr((r[13]||'').trim()),status:normStatus(r[14]),downtimeMins:dt,responseMins:resp,month:(r[23]||'').trim(),week:(r[22]||'').trim()});
   }
   return data;
 }
