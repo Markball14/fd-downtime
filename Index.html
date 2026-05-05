@@ -45,6 +45,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:1.5rem 0}
 .filter-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.65rem 1rem;margin-bottom:1rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .filter-bar label{font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
 .filter-bar select{font-size:12px;padding:4px 7px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--bg);color:var(--text);cursor:pointer}
+.filter-bar input[type="date"]{font-size:12px;padding:4px 7px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--bg);color:var(--text);cursor:pointer;height:28px}.filter-bar .date-sep{font-size:11px;color:var(--text3)}.filter-bar .filter-section{display:flex;align-items:center;gap:5px;padding-right:8px;border-right:1px solid var(--border);margin-right:3px}
 .filter-spacer{flex:1}
 #recordCount{font-size:11px;color:var(--text3)}
 .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:1rem}
@@ -109,6 +110,12 @@ svg{display:block;overflow:visible}
   </div>
   <div id="dashboard">
     <div class="filter-bar">
+      <div class="filter-section">
+        <label>Date range:</label>
+        <input type="date" id="fDateFrom" onchange="applyFilters()" title="From date"/>
+        <span class="date-sep">→</span>
+        <input type="date" id="fDateTo" onchange="applyFilters()" title="To date"/>
+      </div>
       <label>Filter:</label>
       <select id="fLine" onchange="applyFilters()"><option value="">All lines</option></select>
       <select id="fShift" onchange="applyFilters()"><option value="">All shifts</option></select>
@@ -325,8 +332,23 @@ function loadSample(){
 
 function showDashboard(data,src){document.getElementById('authPanel').style.display='none';document.getElementById('dashboard').style.display='block';document.getElementById('lastRefresh').textContent=src+' · '+new Date().toLocaleTimeString();populateFilters(data);renderAll(data);setBtnLoading(false);}
 function populateFilters(data){const fill=(id,key,lbl)=>{const s=document.getElementById(id);const cur=s.value;s.innerHTML='<option value="">All '+lbl+'</option>';[...new Set(data.map(r=>r[key]).filter(Boolean))].sort().forEach(v=>s.innerHTML+='<option value="'+v+'"'+(v===cur?' selected':'')+'>'+v+'</option>');};fill('fLine','line','lines');fill('fShift','shift','shifts');fill('fCat','category','categories');fill('fStatus','status','statuses');fill('fMonth','month','months');}
-function applyFilters(){let d=allData;const g=id=>document.getElementById(id).value;if(g('fLine'))d=d.filter(r=>r.line===g('fLine'));if(g('fShift'))d=d.filter(r=>r.shift===g('fShift'));if(g('fCat'))d=d.filter(r=>r.category===g('fCat'));if(g('fStatus'))d=d.filter(r=>r.status===g('fStatus'));if(g('fMonth'))d=d.filter(r=>r.month===g('fMonth'));renderAll(d);}
-function resetFilters(){['fLine','fShift','fCat','fStatus','fMonth'].forEach(id=>document.getElementById(id).value='');renderAll(allData);}
+function dateToISO(dStr){
+  // Handles mm/dd/yy, mm/dd/yyyy, yyyy-mm-dd
+  if(!dStr)return'';
+  if(/^\d{4}-\d{2}-\d{2}/.test(dStr))return dStr.slice(0,10);
+  const p=dStr.split(/[\/\-]/);
+  if(p.length===3){
+    // mm/dd/yy or mm/dd/yyyy
+    let y=p[2];if(y.length===2)y=(parseInt(y)<50?'20':'19')+y;
+    return y+'-'+p[0].padStart(2,'0')+'-'+p[1].padStart(2,'0');
+  }
+  return dStr.slice(0,10);
+}
+function applyFilters(){let d=allData;const g=id=>document.getElementById(id).value;
+const from=g('fDateFrom'),to=g('fDateTo');
+if(from||to){d=d.filter(r=>{const iso=dateToISO(r.date);if(!iso)return true;if(from&&iso<from)return false;if(to&&iso>to)return false;return true;});}
+if(g('fLine'))d=d.filter(r=>r.line===g('fLine'));if(g('fShift'))d=d.filter(r=>r.shift===g('fShift'));if(g('fCat'))d=d.filter(r=>r.category===g('fCat'));if(g('fStatus'))d=d.filter(r=>r.status===g('fStatus'));if(g('fMonth'))d=d.filter(r=>r.month===g('fMonth'));renderAll(d);}
+function resetFilters(){['fDateFrom','fDateTo','fLine','fShift','fCat','fStatus','fMonth'].forEach(id=>document.getElementById(id).value='');renderAll(allData);}
 function renderAll(data){document.getElementById('recordCount').textContent=data.length+' records';renderMetrics(data);renderPareto(data);renderLine(data);renderCat(data);renderTrend(data);renderResp(data);renderShift(data);renderOpenTable(data);renderAllTable(data);}
 function renderMetrics(data){const v=data.filter(r=>r.downtimeMins>0);const tot=v.reduce((a,r)=>a+r.downtimeMins,0);const avg=v.length?Math.round(tot/v.length):0;const open=data.filter(r=>r.status&&/open|running|progress/i.test(r.status)).length;const rv=data.filter(r=>r.responseMins>=0&&r.responseMins!==null);const avgR=rv.length?Math.round(rv.reduce((a,r)=>a+r.responseMins,0)/rv.length):0;const h=Math.floor(tot/60),m=Math.round(tot%60);const lines=new Set(data.map(r=>r.line).filter(Boolean)).size;document.getElementById('metrics').innerHTML='<div class="metric"><div class="mlabel">Total incidents</div><div class="mvalue">'+data.length+'</div><div class="msub">'+lines+' lines affected</div></div><div class="metric"><div class="mlabel">Total downtime</div><div class="mvalue">'+h+'h '+m+'m</div><div class="msub">'+tot.toLocaleString()+' min total</div></div><div class="metric"><div class="mlabel">Avg per incident</div><div class="mvalue">'+avg+'<span style="font-size:13px;font-weight:400"> min</span></div></div><div class="metric"><div class="mlabel">Avg response time</div><div class="mvalue">'+avgR+'<span style="font-size:13px;font-weight:400"> min</span></div></div><div class="metric '+(open>0?'m-red':'m-green')+'"><div class="mlabel">Open / in-progress</div><div class="mvalue">'+open+'</div><div class="msub">need attention</div></div>';}
 function grp(data,key,valKey,mode){const m={};data.forEach(r=>{const k=r[key]||'Unknown';m[k]=(m[k]||0)+(mode==='sum'?(r[valKey]>0?r[valKey]:0):1);});return Object.entries(m).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);}
