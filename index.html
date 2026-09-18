@@ -429,8 +429,24 @@ function loadSample(){
 
 function showDashboard(data,src){document.getElementById('authPanel').style.display='none';document.getElementById('dashboard').style.display='block';document.getElementById('lastRefresh').textContent=src+' · '+new Date().toLocaleTimeString();populateFilters(data);renderAll(data);setBtnLoading(false);}
 function populateFilters(data){const fill=(id,key,lbl)=>{const s=document.getElementById(id);const cur=s.value;s.innerHTML='<option value="">All '+lbl+'</option>';[...new Set(data.map(r=>r[key]).filter(Boolean))].sort().forEach(v=>s.innerHTML+='<option value="'+v+'"'+(v===cur?' selected':'')+'>'+v+'</option>');};fill('fLine','line','lines');fill('fShift','shift','shifts');fill('fCat','category','categories');fill('fStatus','status','statuses');fill('fMonth','month','months');}
-function applyFilters(){let d=allData;const g=id=>document.getElementById(id).value;if(g('fLine'))d=d.filter(r=>r.line===g('fLine'));if(g('fShift'))d=d.filter(r=>r.shift===g('fShift'));if(g('fCat'))d=d.filter(r=>r.category===g('fCat'));if(g('fStatus'))d=d.filter(r=>r.status===g('fStatus'));if(g('fMonth'))d=d.filter(r=>r.month===g('fMonth'));renderAll(d);}
-function resetFilters(){['fLine','fShift','fCat','fStatus','fMonth'].forEach(id=>document.getElementById(id).value='');renderAll(allData);}
+function applyFilters(){
+  let d=allData;
+  const g=id=>document.getElementById(id).value;
+  if(g('fLine'))d=d.filter(r=>r.line===g('fLine'));
+  if(g('fShift'))d=d.filter(r=>r.shift===g('fShift'));
+  if(g('fCat'))d=d.filter(r=>r.category===g('fCat'));
+  if(g('fStatus'))d=d.filter(r=>r.status===g('fStatus'));
+  if(g('fMonth'))d=d.filter(r=>r.month===g('fMonth'));
+  // Date range filter - both dates are YYYY-MM-DD so string comparison works
+  const from=g('fDateFrom');const to=g('fDateTo');
+  if(from)d=d.filter(r=>r.date&&r.date>=from);
+  if(to)d=d.filter(r=>r.date&&r.date<=to);
+  renderAll(d);
+}
+function resetFilters(){
+  ['fLine','fShift','fCat','fStatus','fMonth','fDateFrom','fDateTo'].forEach(id=>document.getElementById(id).value='');
+  renderAll(allData);
+}
 // Sort state
 let sortCol=null, sortDir=1;
 
