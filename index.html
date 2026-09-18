@@ -400,19 +400,15 @@ function sortData(data, col){
 function renderAll(data){document.getElementById('recordCount').textContent=data.length+' records';renderMetrics(data);renderPareto(data);renderLine(data);renderCat(data);renderTrend(data);renderResp(data);renderShift(data);renderOpenTable(data);renderAllTable(data);}
 function renderMetrics(data){const v=data.filter(r=>r.downtimeMins>0);const tot=v.reduce((a,r)=>a+r.downtimeMins,0);const avg=v.length?Math.round(tot/v.length):0;const open=data.filter(r=>r.status&&/open|running|progress/i.test(r.status)).length;const rv=data.filter(r=>r.responseMins>=0&&r.responseMins!==null);const avgR=rv.length?Math.round(rv.reduce((a,r)=>a+r.responseMins,0)/rv.length):0;const h=Math.floor(tot/60),m=Math.round(tot%60);const lines=new Set(data.map(r=>r.line).filter(Boolean)).size;document.getElementById('metrics').innerHTML='<div class="metric"><div class="mlabel">Total incidents</div><div class="mvalue">'+data.length+'</div><div class="msub">'+lines+' lines affected</div></div><div class="metric"><div class="mlabel">Total downtime</div><div class="mvalue">'+h+'h '+m+'m</div><div class="msub">'+tot.toLocaleString()+' min total</div></div><div class="metric"><div class="mlabel">Avg per incident</div><div class="mvalue">'+avg+'<span style="font-size:13px;font-weight:400"> min</span></div></div><div class="metric"><div class="mlabel">Avg response time</div><div class="mvalue">'+avgR+'<span style="font-size:13px;font-weight:400"> min</span></div></div><div class="metric '+(open>0?'m-red':'m-green')+'"><div class="mlabel">Open / in-progress</div><div class="mvalue">'+open+'</div><div class="msub">need attention</div></div>';}
 function fmtDateDisplay(d){
-  if(!d)return'—';
+  if(!d||d==='—')return'—';
   // Handle Excel serial number (e.g. 46282)
   const num=parseFloat(d);
   if(!isNaN(num)&&num>40000&&num<60000){
     const date=new Date(Math.round((num-25569)*86400*1000));
-    const m=String(date.getUTCMonth()+1).padStart(2,'0');
-    const day=String(date.getUTCDate()).padStart(2,'0');
-    const y=String(date.getUTCFullYear()).slice(2);
-    return m+'/'+day+'/'+y;
+    return String(date.getUTCMonth()+1).padStart(2,'0')+'/'+String(date.getUTCDate()).padStart(2,'0')+'/'+String(date.getUTCFullYear()).slice(2);
   }
-  // Handle ISO string (YYYY-MM-DD)
-  const s=String(d).split('T')[0];
-  const parts=s.split('-');
+  // Handle YYYY-MM-DD string
+  const parts=String(d).split('T')[0].split('-');
   if(parts.length===3)return parts[1]+'/'+parts[2]+'/'+parts[0].slice(2);
   return d;
 }
