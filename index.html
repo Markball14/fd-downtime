@@ -427,7 +427,11 @@ function loadSample(){
   allData=data;showDashboard(data,'Sample Data');
 }
 
-function showDashboard(data,src){document.getElementById('authPanel').style.display='none';document.getElementById('dashboard').style.display='block';document.getElementById('lastRefresh').textContent=src+' · '+new Date().toLocaleTimeString();populateFilters(data);renderAll(data);setBtnLoading(false);}
+function showDashboard(data,src){document.getElementById('authPanel').style.display='none';document.getElementById('dashboard').style.display='block';document.getElementById('lastRefresh').textContent=src+' · '+new Date().toLocaleTimeString();populateFilters(data);
+  const today=new Date().toISOString().split('T')[0];
+  document.getElementById('fDateFrom').value=today;
+  document.getElementById('fDateTo').value=today;
+  applyFilters();setBtnLoading(false);}
 function populateFilters(data){const fill=(id,key,lbl)=>{const s=document.getElementById(id);const cur=s.value;s.innerHTML='<option value="">All '+lbl+'</option>';[...new Set(data.map(r=>r[key]).filter(Boolean))].sort().forEach(v=>s.innerHTML+='<option value="'+v+'"'+(v===cur?' selected':'')+'>'+v+'</option>');};fill('fLine','line','lines');fill('fShift','shift','shifts');fill('fCat','category','categories');fill('fStatus','status','statuses');fill('fMonth','month','months');}
 function applyFilters(){
   let d=allData;
