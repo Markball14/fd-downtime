@@ -352,7 +352,14 @@ function parseRows(rows){
     let dt=null;const c20=(r[20]||'').trim();if(c20){try{const v=parseFloat(c20);if(v>0)dt=v;}catch(e){}}
     if(!dt){const s=toMins(r[3]),e=toMins(r[5]);if(s!==null&&e!==null){let d=e-s;if(d<0)d+=1440;if(d>0&&d<600)dt=d;}}
     let resp=null;const c18=(r[18]||'').trim();if(c18){try{const v=parseFloat(c18);if(v>=0)resp=v;}catch(e){}}
-    data.push({date,shift:(r[1]||'').trim(),line,category:(r[6]||'Unclassified').trim()||'Unclassified',issue:(r[7]||'').trim(),rootCause:(r[8]||'').trim(),dept:(r[9]||'').trim(),actionOwner:(r[12]||'').trim(),dueDate:(r[13]||'').trim(),status:normStatus(r[14]),downtimeMins:dt,responseMins:resp,month:(r[23]||'').trim(),week:(r[22]||'').trim()});
+    // Convert Excel serial date to YYYY-MM-DD string
+    let dateStr=date;
+    const dateNum=parseFloat(date);
+    if(!isNaN(dateNum)&&dateNum>40000&&dateNum<60000){
+      const dd=new Date(Math.round((dateNum-25569)*86400*1000));
+      dateStr=dd.getUTCFullYear()+'-'+String(dd.getUTCMonth()+1).padStart(2,'0')+'-'+String(dd.getUTCDate()).padStart(2,'0');
+    }
+    data.push({date:dateStr,shift:(r[1]||'').trim(),line,category:(r[6]||'Unclassified').trim()||'Unclassified',issue:(r[7]||'').trim(),rootCause:(r[8]||'').trim(),dept:(r[9]||'').trim(),actionOwner:(r[12]||'').trim(),dueDate:(r[13]||'').trim(),status:normStatus(r[14]),downtimeMins:dt,responseMins:resp,month:(r[23]||'').trim(),week:(r[22]||'').trim()});
   }
   return data;
 }
@@ -394,6 +401,16 @@ function renderAll(data){document.getElementById('recordCount').textContent=data
 function renderMetrics(data){const v=data.filter(r=>r.downtimeMins>0);const tot=v.reduce((a,r)=>a+r.downtimeMins,0);const avg=v.length?Math.round(tot/v.length):0;const open=data.filter(r=>r.status&&/open|running|progress/i.test(r.status)).length;const rv=data.filter(r=>r.responseMins>=0&&r.responseMins!==null);const avgR=rv.length?Math.round(rv.reduce((a,r)=>a+r.responseMins,0)/rv.length):0;const h=Math.floor(tot/60),m=Math.round(tot%60);const lines=new Set(data.map(r=>r.line).filter(Boolean)).size;document.getElementById('metrics').innerHTML='<div class="metric"><div class="mlabel">Total incidents</div><div class="mvalue">'+data.length+'</div><div class="msub">'+lines+' lines affected</div></div><div class="metric"><div class="mlabel">Total downtime</div><div class="mvalue">'+h+'h '+m+'m</div><div class="msub">'+tot.toLocaleString()+' min total</div></div><div class="metric"><div class="mlabel">Avg per incident</div><div class="mvalue">'+avg+'<span style="font-size:13px;font-weight:400"> min</span></div></div><div class="metric"><div class="mlabel">Avg response time</div><div class="mvalue">'+avgR+'<span style="font-size:13px;font-weight:400"> min</span></div></div><div class="metric '+(open>0?'m-red':'m-green')+'"><div class="mlabel">Open / in-progress</div><div class="mvalue">'+open+'</div><div class="msub">need attention</div></div>';}
 function fmtDateDisplay(d){
   if(!d)return'—';
+  // Handle Excel serial number (e.g. 46282)
+  const num=parseFloat(d);
+  if(!isNaN(num)&&num>40000&&num<60000){
+    const date=new Date(Math.round((num-25569)*86400*1000));
+    const m=String(date.getUTCMonth()+1).padStart(2,'0');
+    const day=String(date.getUTCDate()).padStart(2,'0');
+    const y=String(date.getUTCFullYear()).slice(2);
+    return m+'/'+day+'/'+y;
+  }
+  // Handle ISO string (YYYY-MM-DD)
   const s=String(d).split('T')[0];
   const parts=s.split('-');
   if(parts.length===3)return parts[1]+'/'+parts[2]+'/'+parts[0].slice(2);
