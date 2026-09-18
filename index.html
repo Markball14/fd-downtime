@@ -345,21 +345,76 @@ function normStatus(s){if(!s)return'';const lo=s.trim().toLowerCase();if(/^open/
 function toMins(t){if(!t)return null;const m=String(t).trim().match(/^(\d{1,2}):(\d{2})(?::\d+)?\s*(AM|PM)?$/i);if(!m)return null;let h=parseInt(m[1]),mn=parseInt(m[2]);if(m[3]){if(/PM/i.test(m[3])&&h!==12)h+=12;if(/AM/i.test(m[3])&&h===12)h=0;}return h*60+mn;}
 function parseRows(rows){
   if(rows.length<2)return[];
-  let hi=0;for(let i=0;i<Math.min(4,rows.length);i++){if(rows[i].some(c=>String(c).toLowerCase().includes('date')||String(c).toLowerCase().includes('line'))){hi=i;break;}}
+  // Find header row and map column indices by name
+  let hi=0;
+  for(let i=0;i<Math.min(5,rows.length);i++){
+    if(rows[i].some(c=>String(c).toLowerCase().includes('date')||String(c).toLowerCase().includes('line'))){hi=i;break;}
+  }
+  // Build column map from header
+  const hdr=rows[hi].map(c=>String(c).toLowerCase().trim());
+  const col=name=>hdr.findIndex(h=>h.includes(name));
+  const iDate=col('date');
+  const iShift=col('shift');
+  const iLine=col('line');
+  const iStart=col('downtime start')||col('start');
+  const iArr=col('maintenance arrival')||col('arrival');
+  const iBack=col('time back up')||col('back up');
+  const iCat=col('category');
+  const iIssue=col('issue');
+  const iRoot=col('root cause')||col('why');
+  const iDept=col('owner')||col('dept');
+  const iActOwner=col('action owner');
+  const iDue=col('due date');
+  const iStatus=col('status');
+  const iResp=col('response (min)');
+  const iTotal=col('total downtime');
+  const iWeek=col('week');
+  const iMonth=col('month');
+
   const data=[];
   for(let i=hi+1;i<rows.length;i++){
-    const r=rows[i];const date=(r[0]||'').trim();const line=normLine(r[2]);if(!date||!line)continue;
-    let dt=null;const c20=(r[20]||'').trim();if(c20){try{const v=parseFloat(c20);if(v>0)dt=v;}catch(e){}}
-    if(!dt){const s=toMins(r[3]),e=toMins(r[5]);if(s!==null&&e!==null){let d=e-s;if(d<0)d+=1440;if(d>0&&d<600)dt=d;}}
-    let resp=null;const c18=(r[18]||'').trim();if(c18){try{const v=parseFloat(c18);if(v>=0)resp=v;}catch(e){}}
-    // Convert Excel serial date to YYYY-MM-DD string
-    let dateStr=date;
-    const dateNum=parseFloat(date);
+    const r=rows[i];
+    const rawDate=iDate>=0?(r[iDate]||''):'';
+    const line=normLine(iLine>=0?r[iLine]:'');
+    if(!rawDate.toString().trim()||!line)continue;
+
+    // Convert date
+    let dateStr=String(rawDate).trim();
+    const dateNum=parseFloat(dateStr);
     if(!isNaN(dateNum)&&dateNum>40000&&dateNum<60000){
       const dd=new Date(Math.round((dateNum-25569)*86400*1000));
       dateStr=dd.getUTCFullYear()+'-'+String(dd.getUTCMonth()+1).padStart(2,'0')+'-'+String(dd.getUTCDate()).padStart(2,'0');
+    } else {
+      dateStr=dateStr.split('T')[0];
     }
-    data.push({date:dateStr,shift:(r[1]||'').trim(),line,category:(r[6]||'Unclassified').trim()||'Unclassified',issue:(r[7]||'').trim(),rootCause:(r[8]||'').trim(),dept:(r[9]||'').trim(),actionOwner:(r[12]||'').trim(),dueDate:(r[13]||'').trim(),status:normStatus(r[14]),downtimeMins:dt,responseMins:resp,month:(r[23]||'').trim(),week:(r[22]||'').trim()});
+
+    // Downtime - prefer calc column
+    let dt=null;
+    if(iTotal>=0){try{const v=parseFloat(r[iTotal]);if(v>0)dt=v;}catch(e){}}
+    if(!dt&&iStart>=0&&iBack>=0){const s=toMins(r[iStart]),e=toMins(r[iBack]);if(s!==null&&e!==null){let d=e-s;if(d<0)d+=1440;if(d>0&&d<600)dt=d;}}
+
+    // Response
+    let resp=null;
+    if(iResp>=0){try{const v=parseFloat(r[iResp]);if(v>=0)resp=v;}catch(e){}}
+
+    // Month/week
+    let month=iMonth>=0?(r[iMonth]||''):'';
+    let week=iWeek>=0?(r[iWeek]||''):'';
+    if(!month&&dateStr)month=dateStr.slice(0,7);
+
+    data.push({
+      date:dateStr,
+      shift:iShift>=0?String(r[iShift]||'').trim():'',
+      line,
+      category:iCat>=0?(String(r[iCat]||'').trim()||'Unclassified'):'Unclassified',
+      issue:iIssue>=0?String(r[iIssue]||'').trim():'',
+      rootCause:iRoot>=0?String(r[iRoot]||'').trim():'',
+      dept:iDept>=0?String(r[iDept]||'').trim():'',
+      actionOwner:iActOwner>=0?String(r[iActOwner]||'').trim():'',
+      dueDate:iDue>=0?String(r[iDue]||'').trim():'',
+      status:normStatus(iStatus>=0?r[iStatus]:''),
+      downtimeMins:dt,responseMins:resp,month:String(month).trim(),week:String(week).trim()
+    });
   }
   return data;
 }
