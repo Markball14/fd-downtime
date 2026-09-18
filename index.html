@@ -482,7 +482,13 @@ function renderResp(data){const lm={};data.forEach(r=>{if(r.line&&r.responseMins
 function renderShift(data){document.getElementById('chartShift').innerHTML=vBar(grp(data,'shift','downtimeMins','sum'),['#1a6fbe','#c45a28','#0a6644','#8a5010']);}
 function badge(s){const sl=String(s).toLowerCase();if(sl.includes('open'))return'<span class="badge b-open">Open</span>';if(/run|progress|process/.test(sl))return'<span class="badge b-run">In progress</span>';if(/clos|done|fixed/.test(sl))return'<span class="badge b-done">Closed</span>';return s?'<span class="badge b-def">'+s+'</span>':'—';}
 function renderOpenTable(data){const open=data.filter(r=>r.status&&/open|running|progress/i.test(r.status));document.getElementById('tblOpen').innerHTML=open.length?open.map(r=>'<tr><td>'+r.date+'</td><td><strong>'+r.line+'</strong></td><td>'+(r.shift||'—')+'</td><td>'+r.category+'</td><td>'+(r.issue||'—')+'</td><td>'+(r.rootCause||'—')+'</td><td>'+(r.downtimeMins||'—')+'</td><td>'+(r.actionOwner||'—')+'</td><td>'+(r.dueDate||'—')+'</td><td>'+badge(r.status)+'</td></tr>').join(''):'<tr><td colspan="10" style="text-align:center;color:#9a9a94;padding:1rem">No open issues ✓</td></tr>';}
-function renderAllTable(data){document.getElementById('tblAll').innerHTML=[...data].sort((a,b)=>b.date>a.date?1:-1).map(r=>'<tr><td>'+r.date+'</td><td>'+r.line+'</td><td>'+(r.shift||'—')+'</td><td>'+r.category+'</td><td>'+(r.issue||'—')+'</td><td>'+(r.downtimeMins||'—')+'</td><td>'+(r.responseMins!==null?r.responseMins:'—')+'</td><td>'+(r.dept||'—')+'</td><td>'+badge(r.status)+'</td></tr>').join('');}
+function renderAllTable(data){
+  const sorted=sortCol?sortData(data,sortCol):[...data].sort((a,b)=>b.date>a.date?1:-1);
+  const arrow=c=>(sortCol===c)?(sortDir===1?'▲':'▼'):'⇅';
+  const th=(c,l)=>'<th style="cursor:pointer;user-select:none;white-space:nowrap" onclick="sortTable(''+c+'')">'+l+' <span style="font-size:9px;opacity:0.5">'+arrow(c)+'</span></th>';
+  document.getElementById('tblAllHead').innerHTML=th('date','Date')+th('line','Line')+th('shift','Shift')+th('category','Category')+th('issue','Issue')+th('downtimeMins','Downtime (min)')+th('responseMins','Response (min)')+th('dept','Dept')+th('status','Status');
+  document.getElementById('tblAll').innerHTML=sorted.map(r=>'<tr style="white-space:nowrap"><td>'+fmtDateDisplay(r.date)+'</td><td>'+r.line+'</td><td>'+(r.shift||'—')+'</td><td>'+r.category+'</td><td style="white-space:normal;max-width:300px">'+(r.issue||'—')+'</td><td>'+(r.downtimeMins||'—')+'</td><td>'+(r.responseMins!==null?r.responseMins:'—')+'</td><td>'+(r.dept||'—')+'</td><td>'+badge(r.status)+'</td></tr>').join('');
+}
 function setStatus(msg,cls){const el=document.getElementById('statusMsg');el.textContent=msg;el.className=cls;}
 function setBtnLoading(on){const btn=document.getElementById('signInBtn');btn.innerHTML=on?'<span class="spinner"></span>Connecting...':'Sign in with Microsoft';btn.disabled=on;}
 </script>
