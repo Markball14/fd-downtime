@@ -45,11 +45,6 @@ hr.div{border:none;border-top:1px solid var(--border);margin:1.5rem 0}
 .filter-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.65rem 1rem;margin-bottom:1rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .filter-bar label{font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
 .filter-bar select{font-size:12px;padding:4px 7px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--bg);color:var(--text);cursor:pointer}
-.filter-bar input[type="date"]{font-size:12px;padding:4px 8px;border:1px solid var(--blue);border-radius:var(--rs);background:var(--blue-bg);color:var(--text);cursor:pointer;height:28px;font-family:inherit}
-.filter-bar input[type="date"]:focus{outline:none;border-color:var(--blue)}
-.date-sep{font-size:13px;color:var(--text3);font-weight:500}
-.date-range-group{display:flex;align-items:center;gap:6px;background:var(--blue-bg);border:1px solid var(--blue);border-radius:var(--rs);padding:3px 10px;margin-right:6px}
-.date-range-group label{color:var(--blue);font-size:10px;letter-spacing:.06em}
 .filter-spacer{flex:1}
 #recordCount{font-size:11px;color:var(--text3)}
 .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:1rem}
@@ -68,10 +63,6 @@ hr.div{border:none;border-top:1px solid var(--border);margin:1.5rem 0}
 .li{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2)}
 .ld{width:10px;height:10px;border-radius:2px;flex-shrink:0}
 .tbl-wrap{overflow-x:auto}
-.tbl-wrap th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
-.tbl-wrap th.sortable:hover{color:var(--blue)}
-.tbl-wrap th.sort-asc::after{content:' ↑';color:var(--blue)}
-.tbl-wrap th.sort-desc::after{content:' ↓';color:var(--blue)}
 table{width:100%;border-collapse:collapse;font-size:12px}
 thead th{text-align:left;padding:6px 8px;border-bottom:1px solid var(--border2);color:var(--text3);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
 tbody td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
@@ -118,13 +109,7 @@ svg{display:block;overflow:visible}
   </div>
   <div id="dashboard">
     <div class="filter-bar">
-      <div class="date-range-group">
-        <label>FROM</label>
-        <input type="date" id="fDateFrom" onchange="applyFilters()" title="Start date"/>
-        <span class="date-sep">—</span>
-        <label>TO</label>
-        <input type="date" id="fDateTo" onchange="applyFilters()" title="End date"/>
-      </div>
+      <label>Filter:</label>
       <select id="fLine" onchange="applyFilters()"><option value="">All lines</option></select>
       <select id="fShift" onchange="applyFilters()"><option value="">All shifts</option></select>
       <select id="fCat" onchange="applyFilters()"><option value="">All categories</option></select>
@@ -149,17 +134,7 @@ svg{display:block;overflow:visible}
       <div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Line</th><th>Shift</th><th>Category</th><th>Issue</th><th>Root cause</th><th>Downtime (min)</th><th>Owner</th><th>Due date</th><th>Status</th></tr></thead><tbody id="tblOpen"></tbody></table></div>
     </div>
     <div class="card"><h3>All incidents</h3>
-      <div class="tbl-wrap"><table id="tableAll"><thead><tr>
-        <th class="sortable" onclick="sortTable('date')" id="sh-date">Date</th>
-        <th class="sortable" onclick="sortTable('line')" id="sh-line">Line</th>
-        <th class="sortable" onclick="sortTable('shift')" id="sh-shift">Shift</th>
-        <th class="sortable" onclick="sortTable('category')" id="sh-category">Category</th>
-        <th>Issue</th>
-        <th class="sortable" onclick="sortTable('downtimeMins')" id="sh-downtimeMins">Downtime (min)</th>
-        <th class="sortable" onclick="sortTable('responseMins')" id="sh-responseMins">Response (min)</th>
-        <th class="sortable" onclick="sortTable('dept')" id="sh-dept">Dept</th>
-        <th class="sortable" onclick="sortTable('status')" id="sh-status">Status</th>
-      </tr></thead><tbody id="tblAll"></tbody></table></div>
+      <div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Line</th><th>Shift</th><th>Category</th><th>Issue</th><th>Downtime (min)</th><th>Response (min)</th><th>Dept</th><th>Status</th></tr></thead><tbody id="tblAll"></tbody></table></div>
     </div>
   </div>
 </div>
@@ -169,6 +144,43 @@ svg{display:block;overflow:visible}
 
 </script>
 <script>
+// Handle redirect promise on page load (for loginRedirect flow)
+window.addEventListener('load', async function(){
+  // Hide sign in button while checking auth state
+  document.getElementById('signInBtn').disabled=true;
+  document.getElementById('signInBtn').textContent='Checking...';
+  try{
+    const cfg=getMsalConfig();
+    msalInstance=new msal.PublicClientApplication(cfg);
+    await msalInstance.initialize();
+    const resp=await msalInstance.handleRedirectPromise();
+    if(resp&&resp.account){
+      // Successfully got token from redirect
+      currentAccount=resp.account;
+      document.getElementById('refreshBtn').style.display='';
+      document.getElementById('signOutBtn').style.display='';
+      setStatus('Signed in as '+resp.account.username+'. Loading file...','s-info');
+      await loadFromSharePoint();
+      return;
+    }
+    // Check if already signed in
+    const accounts=msalInstance.getAllAccounts();
+    if(accounts.length>0){
+      currentAccount=accounts[0];
+      document.getElementById('refreshBtn').style.display='';
+      document.getElementById('signOutBtn').style.display='';
+      setStatus('Resuming session...','s-info');
+      await loadFromSharePoint();
+      return;
+    }
+  }catch(e){
+    console.error('Page load auth error:',e);
+  }
+  // No active session - show sign in button
+  document.getElementById('signInBtn').disabled=false;
+  document.getElementById('signInBtn').textContent='Sign in with Microsoft';
+});
+
 const PAL=['#1a6fbe','#0a6644','#c45a28','#b02868','#8a5010','#4a28a8','#3a7a10','#a82828','#5a5a56','#107080','#c8a000','#2a8080'];
 let allData=[],msalInstance=null,currentAccount=null;
 
@@ -177,27 +189,10 @@ function getMsalConfig(){
 }
 
 async function signIn(){
-  setStatus('Initialising Microsoft login...','s-info');setBtnLoading(true);
+  setStatus('Redirecting to Microsoft login...','s-info');setBtnLoading(true);
   try{
     msalInstance=new msal.PublicClientApplication(getMsalConfig());
     await msalInstance.initialize();
-    // Handle redirect response first (in case we just came back from a redirect)
-    const redirectResp=await msalInstance.handleRedirectPromise();
-    if(redirectResp){
-      currentAccount=redirectResp.account;
-      setStatus('Signed in as '+redirectResp.account.username+'. Loading file...','s-info');
-      await loadFromSharePoint();
-      return;
-    }
-    // Check for existing account
-    const accounts=msalInstance.getAllAccounts();
-    if(accounts.length>0){
-      currentAccount=accounts[0];
-      setStatus('Signed in as '+currentAccount.username+'. Loading file...','s-info');
-      await loadFromSharePoint();
-      return;
-    }
-    // Use redirect instead of popup to avoid browser blocking
     await msalInstance.loginRedirect({scopes:['User.Read','Files.Read','Files.Read.All','Sites.Read.All'],prompt:'select_account'});
   }catch(err){
     console.error(err);
@@ -209,7 +204,7 @@ async function signIn(){
 async function getToken(){
   const scopes=['Files.Read','Files.Read.All','Sites.Read.All'];
   try{const r=await msalInstance.acquireTokenSilent({scopes,account:currentAccount});return r.accessToken;}
-  catch{await msalInstance.acquireTokenRedirect({scopes,account:currentAccount});return null;}
+  catch{const r=await msalInstance.acquireTokenPopup({scopes,account:currentAccount});return r.accessToken;}
 }
 
 async function loadFromSharePoint(){
@@ -219,26 +214,49 @@ async function loadFromSharePoint(){
     const fileName=document.getElementById('fileName').value.trim();
     let downloadUrl=null;
 
-    // Try file owner's drive
-    setStatus('Searching '+owner+"'s drive...",'s-info');
-    const r1=await fetch('https://graph.microsoft.com/v1.0/users/'+encodeURIComponent(owner)+'/drive/root/search(q=\''+encodeURIComponent(fileName)+'\')',{headers:{Authorization:'Bearer '+token}});
-    if(r1.ok){const d=await r1.json();if(d.value&&d.value.length){const f=d.value.find(x=>x.name&&x.name.toLowerCase().includes('downtime'))||d.value[0];downloadUrl='https://graph.microsoft.com/v1.0/users/'+encodeURIComponent(owner)+'/drive/items/'+f.id+'/content';}}
+    // Search Teams SharePoint site (stellachewys.sharepoint.com/sites/ProductionTeam)
+    setStatus('Searching Teams SharePoint site...','s-info');
+    try{
+      const siteResp=await fetch('https://graph.microsoft.com/v1.0/sites/stellachewys.sharepoint.com:/sites/ProductionTeam',{headers:{Authorization:'Bearer '+token}});
+      if(siteResp.ok){
+        const siteData=await siteResp.json();
+        const siteId=siteData.id;
+        const searchResp=await fetch('https://graph.microsoft.com/v1.0/sites/'+siteId+'/drive/root/search(q=''+encodeURIComponent(fileName)+'')',{headers:{Authorization:'Bearer '+token}});
+        if(searchResp.ok){
+          const sd=await searchResp.json();
+          if(sd.value&&sd.value.length){
+            const f=sd.value.find(x=>x.name&&x.name.toLowerCase().includes('downtime'))||sd.value[0];
+            downloadUrl='https://graph.microsoft.com/v1.0/sites/'+siteId+'/drive/items/'+f.id+'/content';
+            setStatus('File found in Teams site. Downloading...','s-info');
+          }
+        }
+      }
+    }catch(e){console.log('Teams site error:',e);}
 
-    // Try my drive
+    // Fallback: search all accessible SharePoint sites
     if(!downloadUrl){
-      setStatus('Searching your drive...','s-info');
-      const r2=await fetch('https://graph.microsoft.com/v1.0/me/drive/root/search(q=\''+encodeURIComponent(fileName)+'\')',{headers:{Authorization:'Bearer '+token}});
-      if(r2.ok){const d=await r2.json();if(d.value&&d.value.length){const f=d.value.find(x=>x.name&&x.name.toLowerCase().includes('downtime'))||d.value[0];downloadUrl='https://graph.microsoft.com/v1.0/me/drive/items/'+f.id+'/content';}}
+      setStatus('Searching all SharePoint sites...','s-info');
+      try{
+        const allSites=await fetch('https://graph.microsoft.com/v1.0/sites?search=ProductionTeam',{headers:{Authorization:'Bearer '+token}});
+        if(allSites.ok){
+          const sitesData=await allSites.json();
+          for(const site of (sitesData.value||[]).slice(0,5)){
+            const sr=await fetch('https://graph.microsoft.com/v1.0/sites/'+site.id+'/drive/root/search(q=''+encodeURIComponent(fileName)+'')',{headers:{Authorization:'Bearer '+token}});
+            if(sr.ok){const sd=await sr.json();if(sd.value&&sd.value.length){const f=sd.value.find(x=>x.name&&x.name.toLowerCase().includes('downtime'))||sd.value[0];downloadUrl='https://graph.microsoft.com/v1.0/sites/'+site.id+'/drive/items/'+f.id+'/content';setStatus('File found. Downloading...','s-info');break;}}
+          }
+        }
+      }catch(e){console.log('All sites error:',e);}
     }
 
-    // Try shared with me
+    // Fallback: shared with me
     if(!downloadUrl){
-      setStatus('Searching shared files...','s-info');
-      const r3=await fetch('https://graph.microsoft.com/v1.0/me/drive/sharedWithMe',{headers:{Authorization:'Bearer '+token}});
-      if(r3.ok){const d=await r3.json();if(d.value){const f=d.value.find(x=>x.name&&x.name.toLowerCase().includes('downtime'));if(f){const rid=f.remoteItem;downloadUrl='https://graph.microsoft.com/v1.0/drives/'+rid.parentReference.driveId+'/items/'+rid.id+'/content';}}}
+      try{
+        const r3=await fetch('https://graph.microsoft.com/v1.0/me/drive/sharedWithMe',{headers:{Authorization:'Bearer '+token}});
+        if(r3.ok){const d=await r3.json();if(d.value){const f=d.value.find(x=>x.name&&x.name.toLowerCase().includes('downtime'));if(f){const rid=f.remoteItem;downloadUrl='https://graph.microsoft.com/v1.0/drives/'+rid.parentReference.driveId+'/items/'+rid.id+'/content';}}}
+      }catch(e){console.log('Shared error:',e);}
     }
 
-    if(!downloadUrl)throw new Error('File not found. Make sure "'+fileName+'" is shared with you in SharePoint/OneDrive.');
+    if(!downloadUrl)throw new Error('File not found. Make sure you have access to the ProductionTeam SharePoint site.');
 
     setStatus('Downloading file...','s-info');
     const dlResp=await fetch(downloadUrl,{headers:{Authorization:'Bearer '+token}});
@@ -306,81 +324,31 @@ async function readZipAsync(buffer){
 }
 function parseSharedStrings(xml){const ss=[],re=/<si>[\s\S]*?<\/si>/g;let m;while((m=re.exec(xml))!==null){const p=m[0].match(/<t[^>]*>([^<]*)<\/t>/g)||[];ss.push(p.map(t=>t.replace(/<[^>]+>/g,'')).join(''));}return ss;}
 function parseSheet(xml,ss){
-  const rows=[],rowRe=/<row[^>]*>([\s\S]*?)<\/row>/g;
-  const cellRe=/<c\s([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g,valRe=/<v>([^<]*)<\/v>/;
+  const rows=[],rowRe=/<row[^>]*>([\s\S]*?)<\/row>/g,cellRe=/<c\s([^>]*)>([\s\S]*?)<\/c>/g,valRe=/<v>([^<]*)<\/v>/;
   let rm;
   while((rm=rowRe.exec(xml))!==null){
-    const cells={};let cm;cellRe.lastIndex=0;
-    while((cm=cellRe.exec(rm[1]))!==null){const a=cm[1],inn=cm[2]||'',rM=a.match(/r="([A-Z]+)/),tM=a.match(/t="([^"]+)"/),vM=valRe.exec(inn);if(!rM)continue;if(!vM){cells[rM[1]]='';continue;}let v=vM[1];if(tM&&tM[1]==='s')v=ss[parseInt(v)]||'';cells[rM[1]]=v;}
+    const cells={};let cm;
+    while((cm=cellRe.exec(rm[1]))!==null){const a=cm[1],inn=cm[2],rM=a.match(/r="([A-Z]+)/),tM=a.match(/t="([^"]+)"/),vM=valRe.exec(inn);if(!rM||!vM)continue;let v=vM[1];if(tM&&tM[1]==='s')v=ss[parseInt(v)]||'';cells[rM[1]]=v;}
     if(Object.keys(cells).length)rows.push(cells);
   }
   const cols='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
   return rows.map(r=>cols.slice(0,24).map(c=>r[c]||''));
 }
 
-// Convert Excel serial date number to mm/dd/yy string
-function excelDateToStr(val){
-  if(!val)return'';
-  const v=String(val).trim();
-  // Already looks like a date string (contains - or /)
-  if(/\d{4}-\d{2}-\d{2}/.test(v))return v; // keep ISO format used elsewhere
-  if(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(v))return v;
-  const n=parseFloat(v);
-  if(!isNaN(n)&&n>40000&&n<60000){
-    const d=new Date((n-25569)*86400*1000);
-    const mm=String(d.getUTCMonth()+1).padStart(2,'0');
-    const dd=String(d.getUTCDate()).padStart(2,'0');
-    const yy=String(d.getUTCFullYear()).slice(-2);
-    return mm+'/'+dd+'/'+yy;
-  }
-  return v;
-}
-
-// Auto-handle redirect response on page load
-document.addEventListener('DOMContentLoaded',async()=>{
-  try{
-    const cfg=getMsalConfig();
-    const tempMsal=new msal.PublicClientApplication(cfg);
-    await tempMsal.initialize();
-    const resp=await tempMsal.handleRedirectPromise();
-    if(resp){
-      msalInstance=tempMsal;
-      currentAccount=resp.account;
-      const ap=document.getElementById('authPanel');
-      const ma=document.getElementById('mainApp');
-      if(ap)ap.style.display='none';
-      if(ma)ma.style.display='block';
-      if(typeof setStatus==='function')setStatus('Signed in as '+resp.account.username+'. Loading file...','s-info');
-      if(typeof loadFromSharePoint==='function')await loadFromSharePoint();
-    }
-  }catch(e){console.warn('Auto-redirect check:',e);}
-});
-
 // Data parsing
 function normLine(l){if(!l)return null;const lo=l.trim().toLowerCase().replace(/\s+/g,'');if(lo==='vk'||lo==='viking2')return'Viking 2';if(lo==='viking1')return'Viking 1';if(lo==='viking3')return'Viking 3';if(lo==='flmatrix')return'FL Matrix';if(lo==='frozen'||lo==='frozenline')return'Frozen Line';return l.trim().replace(/\b\w/g,c=>c.toUpperCase());}
-function normStatus(s){if(!s)return'';const lo=s.trim().toLowerCase();if(/^in.?prog|process|progres/.test(lo))return'In Progress';if(/^clos|done|complet/.test(lo))return'Closed';if(/^open/.test(lo))return'Open';if(/run/.test(lo))return'In Progress';return s.trim();}
+function normStatus(s){if(!s)return'';const lo=s.trim().toLowerCase();if(/^open/.test(lo))return'Open';if(/run|progress|process|progres/.test(lo))return'Running';if(/clos|done|complet/.test(lo))return'Closed';if(/not.?run/.test(lo))return'Not Running';return s.trim();}
 function toMins(t){if(!t)return null;const m=String(t).trim().match(/^(\d{1,2}):(\d{2})(?::\d+)?\s*(AM|PM)?$/i);if(!m)return null;let h=parseInt(m[1]),mn=parseInt(m[2]);if(m[3]){if(/PM/i.test(m[3])&&h!==12)h+=12;if(/AM/i.test(m[3])&&h===12)h=0;}return h*60+mn;}
 function parseRows(rows){
   if(rows.length<2)return[];
   let hi=0;for(let i=0;i<Math.min(4,rows.length);i++){if(rows[i].some(c=>String(c).toLowerCase().includes('date')||String(c).toLowerCase().includes('line'))){hi=i;break;}}
   const data=[];
   for(let i=hi+1;i<rows.length;i++){
-    const r=rows[i];const date=excelDateToStr((r[0]||'').trim());const line=normLine(r[2]);if(!date||!line)continue;
+    const r=rows[i];const date=(r[0]||'').trim();const line=normLine(r[2]);if(!date||!line)continue;
     let dt=null;const c20=(r[20]||'').trim();if(c20){try{const v=parseFloat(c20);if(v>0)dt=v;}catch(e){}}
     if(!dt){const s=toMins(r[3]),e=toMins(r[5]);if(s!==null&&e!==null){let d=e-s;if(d<0)d+=1440;if(d>0&&d<600)dt=d;}}
     let resp=null;const c18=(r[18]||'').trim();if(c18){try{const v=parseFloat(c18);if(v>=0)resp=v;}catch(e){}}
-    // Compute week start (Monday) from the date for grouping
-    let weekKey='';
-    if(date){
-      const iso=dateToISO(date);
-      if(iso){
-        const d=new Date(iso+'T00:00:00Z');
-        const day=d.getUTCDay()||7; // Mon=1..Sun=7
-        d.setUTCDate(d.getUTCDate()-day+1); // back to Monday
-        weekKey=String(d.getUTCMonth()+1).padStart(2,'0')+'/'+String(d.getUTCDate()).padStart(2,'0');
-      }
-    }
-    data.push({date,shift:(r[1]||'').trim(),line,category:(r[6]||'Unclassified').trim()||'Unclassified',issue:(r[7]||'').trim(),rootCause:(r[8]||'').trim(),dept:(r[9]||'').trim(),actionOwner:(r[12]||'').trim(),dueDate:excelDateToStr((r[13]||'').trim()),status:normStatus(r[14]),downtimeMins:dt,responseMins:resp,month:(r[23]||'').trim(),week:weekKey});
+    data.push({date,shift:(r[1]||'').trim(),line,category:(r[6]||'Unclassified').trim()||'Unclassified',issue:(r[7]||'').trim(),rootCause:(r[8]||'').trim(),dept:(r[9]||'').trim(),actionOwner:(r[12]||'').trim(),dueDate:(r[13]||'').trim(),status:normStatus(r[14]),downtimeMins:dt,responseMins:resp,month:(r[23]||'').trim(),week:(r[22]||'').trim()});
   }
   return data;
 }
@@ -395,25 +363,10 @@ function loadSample(){
 
 function showDashboard(data,src){document.getElementById('authPanel').style.display='none';document.getElementById('dashboard').style.display='block';document.getElementById('lastRefresh').textContent=src+' · '+new Date().toLocaleTimeString();populateFilters(data);renderAll(data);setBtnLoading(false);}
 function populateFilters(data){const fill=(id,key,lbl)=>{const s=document.getElementById(id);const cur=s.value;s.innerHTML='<option value="">All '+lbl+'</option>';[...new Set(data.map(r=>r[key]).filter(Boolean))].sort().forEach(v=>s.innerHTML+='<option value="'+v+'"'+(v===cur?' selected':'')+'>'+v+'</option>');};fill('fLine','line','lines');fill('fShift','shift','shifts');fill('fCat','category','categories');fill('fStatus','status','statuses');fill('fMonth','month','months');}
-function dateToISO(dStr){
-  // Handles mm/dd/yy, mm/dd/yyyy, yyyy-mm-dd
-  if(!dStr)return'';
-  if(/^\d{4}-\d{2}-\d{2}/.test(dStr))return dStr.slice(0,10);
-  const p=dStr.split(/[\/\-]/);
-  if(p.length===3){
-    // mm/dd/yy or mm/dd/yyyy
-    let y=p[2];if(y.length===2)y=(parseInt(y)<50?'20':'19')+y;
-    return y+'-'+p[0].padStart(2,'0')+'-'+p[1].padStart(2,'0');
-  }
-  return dStr.slice(0,10);
-}
-function applyFilters(){let d=allData;const g=id=>document.getElementById(id).value;
-const from=g('fDateFrom'),to=g('fDateTo');
-if(from||to){d=d.filter(r=>{const iso=dateToISO(r.date);if(!iso)return true;if(from&&iso<from)return false;if(to&&iso>to)return false;return true;});}
-if(g('fLine'))d=d.filter(r=>r.line===g('fLine'));if(g('fShift'))d=d.filter(r=>r.shift===g('fShift'));if(g('fCat'))d=d.filter(r=>r.category===g('fCat'));if(g('fStatus'))d=d.filter(r=>r.status===g('fStatus'));if(g('fMonth'))d=d.filter(r=>r.month===g('fMonth'));renderAll(d);}
-function resetFilters(){['fDateFrom','fDateTo','fLine','fShift','fCat','fStatus','fMonth'].forEach(id=>document.getElementById(id).value='');renderAll(allData);}
+function applyFilters(){let d=allData;const g=id=>document.getElementById(id).value;if(g('fLine'))d=d.filter(r=>r.line===g('fLine'));if(g('fShift'))d=d.filter(r=>r.shift===g('fShift'));if(g('fCat'))d=d.filter(r=>r.category===g('fCat'));if(g('fStatus'))d=d.filter(r=>r.status===g('fStatus'));if(g('fMonth'))d=d.filter(r=>r.month===g('fMonth'));renderAll(d);}
+function resetFilters(){['fLine','fShift','fCat','fStatus','fMonth'].forEach(id=>document.getElementById(id).value='');renderAll(allData);}
 function renderAll(data){document.getElementById('recordCount').textContent=data.length+' records';renderMetrics(data);renderPareto(data);renderLine(data);renderCat(data);renderTrend(data);renderResp(data);renderShift(data);renderOpenTable(data);renderAllTable(data);}
-function renderMetrics(data){const v=data.filter(r=>r.downtimeMins>0);const tot=v.reduce((a,r)=>a+r.downtimeMins,0);const avg=v.length?Math.round(tot/v.length):0;const open=data.filter(r=>r.status&&/in.?progress|open/i.test(r.status)).length;const rv=data.filter(r=>r.responseMins>=0&&r.responseMins!==null);const avgR=rv.length?Math.round(rv.reduce((a,r)=>a+r.responseMins,0)/rv.length):0;const h=Math.floor(tot/60),m=Math.round(tot%60);const lines=new Set(data.map(r=>r.line).filter(Boolean)).size;document.getElementById('metrics').innerHTML='<div class="metric"><div class="mlabel">Total incidents</div><div class="mvalue">'+data.length+'</div><div class="msub">'+lines+' lines affected</div></div><div class="metric"><div class="mlabel">Total downtime</div><div class="mvalue">'+h+'h '+m+'m</div><div class="msub">'+tot.toLocaleString()+' min total</div></div><div class="metric"><div class="mlabel">Avg per incident</div><div class="mvalue">'+avg+'<span style="font-size:13px;font-weight:400"> min</span></div></div><div class="metric"><div class="mlabel">Avg response time</div><div class="mvalue">'+avgR+'<span style="font-size:13px;font-weight:400"> min</span></div></div><div class="metric '+(open>0?'m-red':'m-green')+'"><div class="mlabel">Open / in-progress</div><div class="mvalue">'+open+'</div><div class="msub">need attention</div></div>';}
+function renderMetrics(data){const v=data.filter(r=>r.downtimeMins>0);const tot=v.reduce((a,r)=>a+r.downtimeMins,0);const avg=v.length?Math.round(tot/v.length):0;const open=data.filter(r=>r.status&&/open|running|progress/i.test(r.status)).length;const rv=data.filter(r=>r.responseMins>=0&&r.responseMins!==null);const avgR=rv.length?Math.round(rv.reduce((a,r)=>a+r.responseMins,0)/rv.length):0;const h=Math.floor(tot/60),m=Math.round(tot%60);const lines=new Set(data.map(r=>r.line).filter(Boolean)).size;document.getElementById('metrics').innerHTML='<div class="metric"><div class="mlabel">Total incidents</div><div class="mvalue">'+data.length+'</div><div class="msub">'+lines+' lines affected</div></div><div class="metric"><div class="mlabel">Total downtime</div><div class="mvalue">'+h+'h '+m+'m</div><div class="msub">'+tot.toLocaleString()+' min total</div></div><div class="metric"><div class="mlabel">Avg per incident</div><div class="mvalue">'+avg+'<span style="font-size:13px;font-weight:400"> min</span></div></div><div class="metric"><div class="mlabel">Avg response time</div><div class="mvalue">'+avgR+'<span style="font-size:13px;font-weight:400"> min</span></div></div><div class="metric '+(open>0?'m-red':'m-green')+'"><div class="mlabel">Open / in-progress</div><div class="mvalue">'+open+'</div><div class="msub">need attention</div></div>';}
 function grp(data,key,valKey,mode){const m={};data.forEach(r=>{const k=r[key]||'Unknown';m[k]=(m[k]||0)+(mode==='sum'?(r[valKey]>0?r[valKey]:0):1);});return Object.entries(m).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);}
 function hBar(entries,col){if(!entries.length)return'<p style="color:#9a9a94;font-size:12px;padding:8px">No data</p>';const PL=130,PR=60,BH=24,GAP=5,W=580,PT=6;const H=entries.length*(BH+GAP)+PT+12;const maxV=entries[0][1];let s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="'+H+'">';entries.forEach(([lbl,val],i)=>{const y=PT+i*(BH+GAP),bW=Math.max(3,val/maxV*(W-PL-PR)),c=Array.isArray(col)?col[i%col.length]:col,ll=lbl.length>18?lbl.slice(0,17)+'…':lbl;s+='<text x="'+(PL-8)+'" y="'+(y+BH/2+4)+'" text-anchor="end" font-size="11" fill="#5a5a56" font-family="Segoe UI,sans-serif">'+ll+'</text><rect x="'+PL+'" y="'+y+'" width="'+bW+'" height="'+BH+'" rx="3" fill="'+c+'"/><text x="'+(PL+bW+6)+'" y="'+(y+BH/2+4)+'" font-size="11" fill="'+c+'" font-weight="600" font-family="Segoe UI,sans-serif">'+Math.round(val).toLocaleString()+'</text>';});return s+'</svg>';}
 function vBar(entries,colors){if(!entries.length)return'<p style="color:#9a9a94;font-size:12px;padding:8px">No data</p>';const W=400,PL=45,PR=15,PT=15,PB=40,CW=W-PL-PR,CH=160,H=CH+PT+PB,maxV=Math.max(...entries.map(e=>e[1]),1),bW=Math.min(52,Math.floor(CW/entries.length*0.68));let s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="'+H+'">';for(let i=0;i<=4;i++){const y=PT+CH*(1-i/4);s+='<line x1="'+PL+'" y1="'+y+'" x2="'+(W-PR)+'" y2="'+y+'" stroke="#e8e8e4" stroke-width="1"/><text x="'+(PL-4)+'" y="'+(y+4)+'" text-anchor="end" font-size="9" fill="#9a9a94" font-family="Segoe UI,sans-serif">'+Math.round(maxV*i/4)+'</text>';}entries.forEach(([lbl,val],i)=>{const x=PL+(i+0.5)*CW/entries.length,bH=Math.max(2,val/maxV*CH),c=Array.isArray(colors)?colors[i%colors.length]:colors;s+='<rect x="'+(x-bW/2)+'" y="'+(PT+CH-bH)+'" width="'+bW+'" height="'+bH+'" rx="3" fill="'+c+'"/><text x="'+x+'" y="'+(H-PB+15)+'" text-anchor="middle" font-size="10" fill="#5a5a56" font-family="Segoe UI,sans-serif">'+(lbl.length>7?lbl.slice(0,6)+'…':lbl)+'</text>';});return s+'</svg>';}
@@ -423,68 +376,12 @@ function paretoChart(entries){if(!entries.length)return'<p style="color:#9a9a94;
 function renderPareto(data){const e=grp(data,'category','downtimeMins','sum'),tot=e.reduce((a,v)=>a+v[1],0)||1;document.getElementById('legPareto').innerHTML=e.map(([l,v],i)=>'<div class="li"><span class="ld" style="background:'+PAL[i%PAL.length]+'"></span>'+l+': '+Math.round(v).toLocaleString()+' min ('+Math.round(v/tot*100)+'%)</div>').join('');document.getElementById('chartPareto').innerHTML=paretoChart(e);}
 function renderLine(data){document.getElementById('chartLine').innerHTML=hBar(grp(data,'line','downtimeMins','sum'),PAL);}
 function renderCat(data){document.getElementById('chartCat').innerHTML=donut(grp(data,'category','','count'));}
-function weekKeyToDate(wk){
-  // wk could be ISO "2026-W10", "2026-01-W1", or a date string
-  if(!wk)return wk;
-  // Try ISO week format: 2026-W10
-  let m=wk.match(/^(\d{4})-W(\d{1,2})$/);
-  if(m){
-    const jan4=new Date(parseInt(m[1]),0,4);
-    const startOfW1=new Date(jan4);
-    startOfW1.setDate(jan4.getDate()-(jan4.getDay()||7)+1);
-    const d=new Date(startOfW1);
-    d.setDate(startOfW1.getDate()+(parseInt(m[2])-1)*7);
-    return String(d.getUTCMonth()+1).padStart(2,'0')+'/'+String(d.getUTCDate()).padStart(2,'0');
-  }
-  // Try month-based: 2026-01-W2
-  m=wk.match(/^(\d{4})-(\d{2})-W(\d)$/);
-  if(m){
-    const weekNum=parseInt(m[3]);
-    const d=new Date(parseInt(m[1]),parseInt(m[2])-1,1+(weekNum-1)*7);
-    // Go back to Monday
-    const day=d.getDay()||7;
-    d.setDate(d.getDate()-day+1);
-    return String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getDate()).padStart(2,'0');
-  }
-  // Already a date-like string, just return mm/dd portion
-  return wk.slice(5).replace('-','/');
-}
-function renderTrend(data){
-  const m={};
-  // Group by year+week for correct sorting, display as mm/dd
-  data.forEach(r=>{
-    if(r.downtimeMins>0&&r.week&&r.date){
-      const yr=dateToISO(r.date).slice(0,4);
-      const sortKey=yr+'-'+r.week; // e.g. "2026-03/10" for sorting
-      if(!m[sortKey])m[sortKey]={label:r.week,total:0};
-      m[sortKey].total+=r.downtimeMins;
-    }
-  });
-  const sorted=Object.entries(m).sort((a,b)=>a[0]>b[0]?1:-1);
-  document.getElementById('chartTrend').innerHTML=lineChart(sorted.map(([,v])=>[v.label,v.total]));
-}
+function renderTrend(data){const m={};data.forEach(r=>{if(r.downtimeMins>0&&r.week)m[r.week]=(m[r.week]||0)+r.downtimeMins;});document.getElementById('chartTrend').innerHTML=lineChart(Object.entries(m).sort((a,b)=>a[0]>b[0]?1:-1));}
 function renderResp(data){const lm={};data.forEach(r=>{if(r.line&&r.responseMins>=0&&r.responseMins!==null){if(!lm[r.line])lm[r.line]=[];lm[r.line].push(r.responseMins);}});const e=Object.entries(lm).map(([k,v])=>[k,Math.round(v.reduce((a,b)=>a+b,0)/v.length)]).sort((a,b)=>b[1]-a[1]);document.getElementById('chartResp').innerHTML=hBar(e,'#c45a28');}
 function renderShift(data){document.getElementById('chartShift').innerHTML=vBar(grp(data,'shift','downtimeMins','sum'),['#1a6fbe','#c45a28','#0a6644','#8a5010']);}
 function badge(s){const sl=String(s).toLowerCase();if(sl.includes('open'))return'<span class="badge b-open">Open</span>';if(/run|progress|process/.test(sl))return'<span class="badge b-run">In progress</span>';if(/clos|done|fixed/.test(sl))return'<span class="badge b-done">Closed</span>';return s?'<span class="badge b-def">'+s+'</span>':'—';}
-function renderOpenTable(data){const open=data.filter(r=>r.status&&/in.?progress|open/i.test(r.status));document.getElementById('tblOpen').innerHTML=open.length?open.map(r=>'<tr><td>'+r.date+'</td><td><strong>'+r.line+'</strong></td><td>'+(r.shift||'—')+'</td><td>'+r.category+'</td><td>'+(r.issue||'—')+'</td><td>'+(r.rootCause||'—')+'</td><td>'+(r.downtimeMins||'—')+'</td><td>'+(r.actionOwner||'—')+'</td><td>'+(r.dueDate||'—')+'</td><td>'+badge(r.status)+'</td></tr>').join(''):'<tr><td colspan="10" style="text-align:center;color:#9a9a94;padding:1rem">No open issues ✓</td></tr>';}
-let _sortCol='date', _sortDir=-1, _lastData=[];
-function sortTable(col){
-  if(_sortCol===col){_sortDir*=-1;}else{_sortCol=col;_sortDir=col==='date'||col==='downtimeMins'||col==='responseMins'?-1:1;}
-  // Update header indicators
-  document.querySelectorAll('.sortable').forEach(th=>th.classList.remove('sort-asc','sort-desc'));
-  const th=document.getElementById('sh-'+col);
-  if(th)th.classList.add(_sortDir===1?'sort-asc':'sort-desc');
-  renderAllTable(_lastData);
-}
-function renderAllTable(data){
-  _lastData=data;
-  const sorted=[...data].sort((a,b)=>{
-    let av=a[_sortCol]??'', bv=b[_sortCol]??'';
-    if(typeof av==='number'&&typeof bv==='number')return(av-bv)*_sortDir;
-    return(String(av)>String(bv)?1:String(av)<String(bv)?-1:0)*_sortDir;
-  });
-  document.getElementById('tblAll').innerHTML=sorted.map(r=>'<tr><td>'+r.date+'</td><td>'+r.line+'</td><td>'+(r.shift||'—')+'</td><td>'+r.category+'</td><td>'+(r.issue||'—')+'</td><td>'+(r.downtimeMins||'—')+'</td><td>'+(r.responseMins!==null?r.responseMins:'—')+'</td><td>'+(r.dept||'—')+'</td><td>'+badge(r.status)+'</td></tr>').join('');
-}
+function renderOpenTable(data){const open=data.filter(r=>r.status&&/open|running|progress/i.test(r.status));document.getElementById('tblOpen').innerHTML=open.length?open.map(r=>'<tr><td>'+r.date+'</td><td><strong>'+r.line+'</strong></td><td>'+(r.shift||'—')+'</td><td>'+r.category+'</td><td>'+(r.issue||'—')+'</td><td>'+(r.rootCause||'—')+'</td><td>'+(r.downtimeMins||'—')+'</td><td>'+(r.actionOwner||'—')+'</td><td>'+(r.dueDate||'—')+'</td><td>'+badge(r.status)+'</td></tr>').join(''):'<tr><td colspan="10" style="text-align:center;color:#9a9a94;padding:1rem">No open issues ✓</td></tr>';}
+function renderAllTable(data){document.getElementById('tblAll').innerHTML=[...data].sort((a,b)=>b.date>a.date?1:-1).map(r=>'<tr><td>'+r.date+'</td><td>'+r.line+'</td><td>'+(r.shift||'—')+'</td><td>'+r.category+'</td><td>'+(r.issue||'—')+'</td><td>'+(r.downtimeMins||'—')+'</td><td>'+(r.responseMins!==null?r.responseMins:'—')+'</td><td>'+(r.dept||'—')+'</td><td>'+badge(r.status)+'</td></tr>').join('');}
 function setStatus(msg,cls){const el=document.getElementById('statusMsg');el.textContent=msg;el.className=cls;}
 function setBtnLoading(on){const btn=document.getElementById('signInBtn');btn.innerHTML=on?'<span class="spinner"></span>Connecting...':'Sign in with Microsoft';btn.disabled=on;}
 </script>
