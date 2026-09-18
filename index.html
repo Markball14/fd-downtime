@@ -114,11 +114,11 @@ svg{display:block;overflow:visible}
       <select id="fShift" onchange="applyFilters()"><option value="">All shifts</option></select>
       <select id="fCat" onchange="applyFilters()"><option value="">All categories</option></select>
       <select id="fStatus" onchange="applyFilters()"><option value="">All statuses</option></select>
-      <select id="fMonth" onchange="applyFilters()"><option value="">All months</option></select>
+      <select id="fMonth" onchange="applyFilters('month')"><option value="">All months</option></select>
       <label style="margin-left:8px">From:</label>
-      <input type="date" id="fDateFrom" onchange="applyFilters()" style="font-size:12px;padding:4px 7px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--bg);color:var(--text)"/>
+      <input type="date" id="fDateFrom" onchange="applyFilters('date')" style="font-size:12px;padding:4px 7px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--bg);color:var(--text)"/>
       <label>To:</label>
-      <input type="date" id="fDateTo" onchange="applyFilters()" style="font-size:12px;padding:4px 7px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--bg);color:var(--text)"/>
+      <input type="date" id="fDateTo" onchange="applyFilters('date')" style="font-size:12px;padding:4px 7px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--bg);color:var(--text)"/>
       <div class="filter-spacer"></div>
       <span id="recordCount"></span>
       <button class="btn btn-outline" onclick="resetFilters()" style="font-size:11px;padding:4px 9px">Reset</button>
@@ -433,15 +433,21 @@ function showDashboard(data,src){document.getElementById('authPanel').style.disp
   document.getElementById('fDateTo').value=today;
   applyFilters();setBtnLoading(false);}
 function populateFilters(data){const fill=(id,key,lbl)=>{const s=document.getElementById(id);const cur=s.value;s.innerHTML='<option value="">All '+lbl+'</option>';[...new Set(data.map(r=>r[key]).filter(Boolean))].sort().forEach(v=>s.innerHTML+='<option value="'+v+'"'+(v===cur?' selected':'')+'>'+v+'</option>');};fill('fLine','line','lines');fill('fShift','shift','shifts');fill('fCat','category','categories');fill('fStatus','status','statuses');fill('fMonth','month','months');}
-function applyFilters(){
+function applyFilters(src){
   let d=allData;
   const g=id=>document.getElementById(id).value;
+  // If month selected, clear date range. If date range used, clear month.
+  if(src==='month'&&g('fMonth')){
+    document.getElementById('fDateFrom').value='';
+    document.getElementById('fDateTo').value='';
+  } else if(src==='date'&&(g('fDateFrom')||g('fDateTo'))){
+    document.getElementById('fMonth').value='';
+  }
   if(g('fLine'))d=d.filter(r=>r.line===g('fLine'));
   if(g('fShift'))d=d.filter(r=>r.shift===g('fShift'));
   if(g('fCat'))d=d.filter(r=>r.category===g('fCat'));
   if(g('fStatus'))d=d.filter(r=>r.status===g('fStatus'));
   if(g('fMonth'))d=d.filter(r=>r.month===g('fMonth'));
-  // Date range filter - both dates are YYYY-MM-DD so string comparison works
   const from=g('fDateFrom');const to=g('fDateTo');
   if(from)d=d.filter(r=>r.date&&r.date>=from);
   if(to)d=d.filter(r=>r.date&&r.date<=to);
