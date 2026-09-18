@@ -406,7 +406,7 @@ function parseRows(rows){
       date:dateStr,
       shift:iShift>=0?String(r[iShift]||'').trim():'',
       line,
-      category:iCat>=0?(String(r[iCat]||'').trim()||'Unclassified'):'Unclassified',
+      category:(()=>{const c=iCat>=0?String(r[iCat]||'').trim():'';return(c&&isNaN(parseFloat(c))&&c.length>1)?c:'Unclassified';})(),
       issue:iIssue>=0?String(r[iIssue]||'').trim():'',
       rootCause:iRoot>=0?String(r[iRoot]||'').trim():'',
       dept:iDept>=0?String(r[iDept]||'').trim():'',
