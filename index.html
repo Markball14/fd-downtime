@@ -115,6 +115,10 @@ svg{display:block;overflow:visible}
       <select id="fCat" onchange="applyFilters()"><option value="">All categories</option></select>
       <select id="fStatus" onchange="applyFilters()"><option value="">All statuses</option></select>
       <select id="fMonth" onchange="applyFilters()"><option value="">All months</option></select>
+      <label style="margin-left:8px">From:</label>
+      <input type="date" id="fDateFrom" onchange="applyFilters()" style="font-size:12px;padding:4px 7px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--bg);color:var(--text)"/>
+      <label>To:</label>
+      <input type="date" id="fDateTo" onchange="applyFilters()" style="font-size:12px;padding:4px 7px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--bg);color:var(--text)"/>
       <div class="filter-spacer"></div>
       <span id="recordCount"></span>
       <button class="btn btn-outline" onclick="resetFilters()" style="font-size:11px;padding:4px 9px">Reset</button>
@@ -134,7 +138,7 @@ svg{display:block;overflow:visible}
       <div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Line</th><th>Shift</th><th>Category</th><th>Issue</th><th>Root cause</th><th>Downtime (min)</th><th>Owner</th><th>Due date</th><th>Status</th></tr></thead><tbody id="tblOpen"></tbody></table></div>
     </div>
     <div class="card"><h3>All incidents</h3>
-      <div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Line</th><th>Shift</th><th>Category</th><th>Issue</th><th>Downtime (min)</th><th>Response (min)</th><th>Dept</th><th>Status</th></tr></thead><tbody id="tblAll"></tbody></table></div>
+      <div class="tbl-wrap"><table><thead><tr id="tblAllHead"><th>Date</th><th>Line</th><th>Shift</th><th>Category</th><th>Issue</th><th>Downtime (min)</th><th>Response (min)</th><th>Dept</th><th>Status</th></tr></thead><tbody id="tblAll"></tbody></table></div>
     </div>
   </div>
 </div>
@@ -365,8 +369,37 @@ function showDashboard(data,src){document.getElementById('authPanel').style.disp
 function populateFilters(data){const fill=(id,key,lbl)=>{const s=document.getElementById(id);const cur=s.value;s.innerHTML='<option value="">All '+lbl+'</option>';[...new Set(data.map(r=>r[key]).filter(Boolean))].sort().forEach(v=>s.innerHTML+='<option value="'+v+'"'+(v===cur?' selected':'')+'>'+v+'</option>');};fill('fLine','line','lines');fill('fShift','shift','shifts');fill('fCat','category','categories');fill('fStatus','status','statuses');fill('fMonth','month','months');}
 function applyFilters(){let d=allData;const g=id=>document.getElementById(id).value;if(g('fLine'))d=d.filter(r=>r.line===g('fLine'));if(g('fShift'))d=d.filter(r=>r.shift===g('fShift'));if(g('fCat'))d=d.filter(r=>r.category===g('fCat'));if(g('fStatus'))d=d.filter(r=>r.status===g('fStatus'));if(g('fMonth'))d=d.filter(r=>r.month===g('fMonth'));renderAll(d);}
 function resetFilters(){['fLine','fShift','fCat','fStatus','fMonth'].forEach(id=>document.getElementById(id).value='');renderAll(allData);}
+// Sort state
+let sortCol=null, sortDir=1;
+
+function sortTable(col){
+  if(sortCol===col){sortDir*=-1;}else{sortCol=col;sortDir=1;}
+  // Re-render with current filtered data
+  applyFilters();
+}
+
+function sortData(data, col){
+  if(!col)return data;
+  return [...data].sort((a,b)=>{
+    let av=a[col],bv=b[col];
+    if(col==='downtimeMins'||col==='responseMins'){av=parseFloat(av)||0;bv=parseFloat(bv)||0;}
+    else{av=String(av||'').toLowerCase();bv=String(bv||'').toLowerCase();}
+    if(av<bv)return -sortDir;
+    if(av>bv)return sortDir;
+    return 0;
+  });
+}
+
 function renderAll(data){document.getElementById('recordCount').textContent=data.length+' records';renderMetrics(data);renderPareto(data);renderLine(data);renderCat(data);renderTrend(data);renderResp(data);renderShift(data);renderOpenTable(data);renderAllTable(data);}
 function renderMetrics(data){const v=data.filter(r=>r.downtimeMins>0);const tot=v.reduce((a,r)=>a+r.downtimeMins,0);const avg=v.length?Math.round(tot/v.length):0;const open=data.filter(r=>r.status&&/open|running|progress/i.test(r.status)).length;const rv=data.filter(r=>r.responseMins>=0&&r.responseMins!==null);const avgR=rv.length?Math.round(rv.reduce((a,r)=>a+r.responseMins,0)/rv.length):0;const h=Math.floor(tot/60),m=Math.round(tot%60);const lines=new Set(data.map(r=>r.line).filter(Boolean)).size;document.getElementById('metrics').innerHTML='<div class="metric"><div class="mlabel">Total incidents</div><div class="mvalue">'+data.length+'</div><div class="msub">'+lines+' lines affected</div></div><div class="metric"><div class="mlabel">Total downtime</div><div class="mvalue">'+h+'h '+m+'m</div><div class="msub">'+tot.toLocaleString()+' min total</div></div><div class="metric"><div class="mlabel">Avg per incident</div><div class="mvalue">'+avg+'<span style="font-size:13px;font-weight:400"> min</span></div></div><div class="metric"><div class="mlabel">Avg response time</div><div class="mvalue">'+avgR+'<span style="font-size:13px;font-weight:400"> min</span></div></div><div class="metric '+(open>0?'m-red':'m-green')+'"><div class="mlabel">Open / in-progress</div><div class="mvalue">'+open+'</div><div class="msub">need attention</div></div>';}
+function fmtDateDisplay(d){
+  if(!d)return'—';
+  const s=String(d).split('T')[0];
+  const parts=s.split('-');
+  if(parts.length===3)return parts[1]+'/'+parts[2]+'/'+parts[0].slice(2);
+  return d;
+}
+
 function grp(data,key,valKey,mode){const m={};data.forEach(r=>{const k=r[key]||'Unknown';m[k]=(m[k]||0)+(mode==='sum'?(r[valKey]>0?r[valKey]:0):1);});return Object.entries(m).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);}
 function hBar(entries,col){if(!entries.length)return'<p style="color:#9a9a94;font-size:12px;padding:8px">No data</p>';const PL=130,PR=60,BH=24,GAP=5,W=580,PT=6;const H=entries.length*(BH+GAP)+PT+12;const maxV=entries[0][1];let s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="'+H+'">';entries.forEach(([lbl,val],i)=>{const y=PT+i*(BH+GAP),bW=Math.max(3,val/maxV*(W-PL-PR)),c=Array.isArray(col)?col[i%col.length]:col,ll=lbl.length>18?lbl.slice(0,17)+'…':lbl;s+='<text x="'+(PL-8)+'" y="'+(y+BH/2+4)+'" text-anchor="end" font-size="11" fill="#5a5a56" font-family="Segoe UI,sans-serif">'+ll+'</text><rect x="'+PL+'" y="'+y+'" width="'+bW+'" height="'+BH+'" rx="3" fill="'+c+'"/><text x="'+(PL+bW+6)+'" y="'+(y+BH/2+4)+'" font-size="11" fill="'+c+'" font-weight="600" font-family="Segoe UI,sans-serif">'+Math.round(val).toLocaleString()+'</text>';});return s+'</svg>';}
 function vBar(entries,colors){if(!entries.length)return'<p style="color:#9a9a94;font-size:12px;padding:8px">No data</p>';const W=400,PL=45,PR=15,PT=15,PB=40,CW=W-PL-PR,CH=160,H=CH+PT+PB,maxV=Math.max(...entries.map(e=>e[1]),1),bW=Math.min(52,Math.floor(CW/entries.length*0.68));let s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="'+H+'">';for(let i=0;i<=4;i++){const y=PT+CH*(1-i/4);s+='<line x1="'+PL+'" y1="'+y+'" x2="'+(W-PR)+'" y2="'+y+'" stroke="#e8e8e4" stroke-width="1"/><text x="'+(PL-4)+'" y="'+(y+4)+'" text-anchor="end" font-size="9" fill="#9a9a94" font-family="Segoe UI,sans-serif">'+Math.round(maxV*i/4)+'</text>';}entries.forEach(([lbl,val],i)=>{const x=PL+(i+0.5)*CW/entries.length,bH=Math.max(2,val/maxV*CH),c=Array.isArray(colors)?colors[i%colors.length]:colors;s+='<rect x="'+(x-bW/2)+'" y="'+(PT+CH-bH)+'" width="'+bW+'" height="'+bH+'" rx="3" fill="'+c+'"/><text x="'+x+'" y="'+(H-PB+15)+'" text-anchor="middle" font-size="10" fill="#5a5a56" font-family="Segoe UI,sans-serif">'+(lbl.length>7?lbl.slice(0,6)+'…':lbl)+'</text>';});return s+'</svg>';}
