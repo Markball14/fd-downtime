@@ -340,7 +340,7 @@ function parseSheet(xml,ss){
 }
 
 // Data parsing
-function normLine(l){if(!l)return null;const lo=l.trim().toLowerCase().replace(/\s+/g,'');if(lo==='vk'||lo==='viking2')return'Viking 2';if(lo==='viking1')return'Viking 1';if(lo==='viking3')return'Viking 3';if(lo==='flmatrix')return'FL Matrix';if(lo==='frozen'||lo==='frozenline')return'Frozen Line';return l.trim().replace(/\b\w/g,c=>c.toUpperCase());}
+function normLine(l){if(!l)return null;const t=l.trim();if(!t||/^\d+(\.\d+)?$/.test(t))return null;const lo=t.toLowerCase().replace(/\s+/g,'');if(lo==='vk'||lo==='viking2')return'Viking 2';if(lo==='viking1')return'Viking 1';if(lo==='viking3')return'Viking 3';if(lo==='flmatrix')return'FL Matrix';if(lo==='frozen'||lo==='frozenline')return'Frozen Line';return t.replace(/\b\w/g,c=>c.toUpperCase());}
 function normStatus(s){if(!s)return'';const lo=s.trim().toLowerCase();if(/^open/.test(lo))return'Open';if(/run|progress|process|progres/.test(lo))return'Running';if(/clos|done|complet/.test(lo))return'Closed';if(/not.?run/.test(lo))return'Not Running';return s.trim();}
 function toMins(t){if(!t)return null;const m=String(t).trim().match(/^(\d{1,2}):(\d{2})(?::\d+)?\s*(AM|PM)?$/i);if(!m)return null;let h=parseInt(m[1]),mn=parseInt(m[2]);if(m[3]){if(/PM/i.test(m[3])&&h!==12)h+=12;if(/AM/i.test(m[3])&&h===12)h=0;}return h*60+mn;}
 function parseRows(rows){
@@ -413,7 +413,7 @@ function parseRows(rows){
       actionOwner:iActOwner>=0?String(r[iActOwner]||'').trim():'',
       dueDate:iDue>=0?String(r[iDue]||'').trim():'',
       status:normStatus(iStatus>=0?r[iStatus]:''),
-      downtimeMins:dt,responseMins:resp,month:String(month).trim(),week:String(week).trim()
+      downtimeMins:dt,responseMins:resp,month:(()=>{const m=String(month).trim();return(m&&!/^\d+$/.test(m))?m:''})(),week:(()=>{const w=String(week).trim();return(w&&!/^\d+$/.test(w))?w:'';})()
     });
   }
   return data;
