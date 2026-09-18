@@ -485,7 +485,7 @@ function renderOpenTable(data){const open=data.filter(r=>r.status&&/open|running
 function renderAllTable(data){
   const sorted=sortCol?sortData(data,sortCol):[...data].sort((a,b)=>b.date>a.date?1:-1);
   const arrow=c=>(sortCol===c)?(sortDir===1?'▲':'▼'):'⇅';
-  const th=(c,l)=>'<th style="cursor:pointer;user-select:none;white-space:nowrap" onclick="sortTable(''+c+'')">'+l+' <span style="font-size:9px;opacity:0.5">'+arrow(c)+'</span></th>';
+  const th=(c,l)=>'<th style="cursor:pointer;user-select:none;white-space:nowrap" onclick="sortTable(\''+c+'\')">'+(l)+' <span style="font-size:9px;opacity:0.5">'+arrow(c)+'</span></th>';
   document.getElementById('tblAllHead').innerHTML=th('date','Date')+th('line','Line')+th('shift','Shift')+th('category','Category')+th('issue','Issue')+th('downtimeMins','Downtime (min)')+th('responseMins','Response (min)')+th('dept','Dept')+th('status','Status');
   document.getElementById('tblAll').innerHTML=sorted.map(r=>'<tr style="white-space:nowrap"><td>'+fmtDateDisplay(r.date)+'</td><td>'+r.line+'</td><td>'+(r.shift||'—')+'</td><td>'+r.category+'</td><td style="white-space:normal;max-width:300px">'+(r.issue||'—')+'</td><td>'+(r.downtimeMins||'—')+'</td><td>'+(r.responseMins!==null?r.responseMins:'—')+'</td><td>'+(r.dept||'—')+'</td><td>'+badge(r.status)+'</td></tr>').join('');
 }
