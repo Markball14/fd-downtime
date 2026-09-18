@@ -221,7 +221,7 @@ async function loadFromSharePoint(){
       if(siteResp.ok){
         const siteData=await siteResp.json();
         const siteId=siteData.id;
-        const searchResp=await fetch('https://graph.microsoft.com/v1.0/sites/'+siteId+'/drive/root/search(q=''+encodeURIComponent(fileName)+'')',{headers:{Authorization:'Bearer '+token}});
+        const searchResp=await fetch('https://graph.microsoft.com/v1.0/sites/'+siteId+"/drive/root/search(q='"+encodeURIComponent(fileName)+"')",{headers:{Authorization:'Bearer '+token}});
         if(searchResp.ok){
           const sd=await searchResp.json();
           if(sd.value&&sd.value.length){
@@ -241,7 +241,7 @@ async function loadFromSharePoint(){
         if(allSites.ok){
           const sitesData=await allSites.json();
           for(const site of (sitesData.value||[]).slice(0,5)){
-            const sr=await fetch('https://graph.microsoft.com/v1.0/sites/'+site.id+'/drive/root/search(q=''+encodeURIComponent(fileName)+'')',{headers:{Authorization:'Bearer '+token}});
+            const sr=await fetch('https://graph.microsoft.com/v1.0/sites/'+site.id+"/drive/root/search(q='"+encodeURIComponent(fileName)+"')",{headers:{Authorization:'Bearer '+token}});
             if(sr.ok){const sd=await sr.json();if(sd.value&&sd.value.length){const f=sd.value.find(x=>x.name&&x.name.toLowerCase().includes('downtime'))||sd.value[0];downloadUrl='https://graph.microsoft.com/v1.0/sites/'+site.id+'/drive/items/'+f.id+'/content';setStatus('File found. Downloading...','s-info');break;}}
           }
         }
